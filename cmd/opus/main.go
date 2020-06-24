@@ -16,7 +16,7 @@ func main() {
 		log.Fatalln("Usage:", os.Args[0], "file")
 	}
 
-	if err := opus.Convert(os.Args[1], opus.ConvertExt(os.Args[1], "opus")); err != nil {
+	if _, err := opus.Convert(os.Args[1], opus.ConvertExt(os.Args[1], "opus")); err != nil {
 		log.Fatalln(err)
 	}
 }
