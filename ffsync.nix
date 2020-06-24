@@ -47,14 +47,6 @@ in {
 	};
 
 	config = mkIf (cfg.src != "" && cfg.dst != "") {
-		users.users.ffsync = {
-			group      = "ffsync";
-			home       = cfg.dst;
-			uid        = config.ids.uids.ffsync;
-			createHome = true;
-		};
-		users.groups.ffsync.gid = config.ids.uids.ffsync;
-
 		systemd.services.ffsync = {
 			description = "ffsync";
 			after    = [ "influxdb.service" ];
@@ -72,8 +64,8 @@ in {
 					${lib.escapeShellArg cfg.dst}
 				'';
 				Type  = "simple";
-				User  = "ffsync";
-				Group = "ffsync";
+				User  = "nobody";
+				Group = "nobody";
 				Restart = "on-failure";
 				NoNewPrivileges = true;
 				LimitNICE   = 5; # lowish
