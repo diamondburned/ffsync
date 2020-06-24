@@ -37,7 +37,7 @@ in {
 		};
 
 		package = mkOption {
-			default = pkgs.callPackage ./default.nix;
+			default = pkgs.callPackage ./default.nix {};
 			type = types.package;
 		};
 	};
