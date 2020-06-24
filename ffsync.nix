@@ -48,13 +48,17 @@ in {
 
 	config = mkIf (cfg.src != "" && cfg.dst != "") {
 		users.users.ffsync = {
+			group      = "ffsync";
 			home       = cfg.dst;
+			uid        = config.ids.uids.ffsync;
 			createHome = true;
 		};
+		users.groups.ffsync.gid = config.ids.uids.ffsync;
 
 		systemd.services.ffsync = {
 			description = "ffsync";
 			after    = [ "influxdb.service" ];
+			wants    = [ "influxdb.service" ];
 			wantedBy = [ "multi-user.target" ];
 			environment = {
 				FFSYNC_INFLUX_ADDRESS  = cfg.influx.address;
