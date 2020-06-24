@@ -2,6 +2,8 @@ module github.com/diamondburned/ffsync
 
 go 1.14
 
+replace github.com/influxdata/influxdb-client-go => github.com/diamondburned/influxdb-client-go v1.3.1-0.20200624231924-e91726a5b205
+
 require (
 	github.com/Netflix/go-env v0.0.0-20200512170851-5660fe1ab40a
 	github.com/diamondburned/sfmatch v0.0.0-20200622013314-3564cc575b5b
