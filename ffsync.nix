@@ -64,19 +64,19 @@ in {
 					${lib.escapeShellArg cfg.dst}
 				'';
 				Type  = "simple";
-				User  = "nobody";
-				Group = "nobody";
 				Restart = "on-failure";
 				NoNewPrivileges = true;
 				LimitNICE   = 5; # lowish
 				LimitNPROC  = 64;
 				LimitNOFILE = 128;
+				DynamicUser    = true;
 				PrivateTmp     = true;
 				PrivateDevices = true;
 				ProtectHome    = true;
-				ProtectSystem  = "full";
+				ProtectSystem  = "strict";
 				ReadOnlyPaths  = cfg.src;
 				ReadWritePaths = cfg.dst;
+				InaccessiblePaths = "/";
 			};
 		};
 	};
