@@ -25,6 +25,11 @@ in {
 						type = types.str;
 						description = "InfluxDB token";
 					};
+					database = mkOption {
+						type = types.str;
+						default = "ffsync";
+						description = "InfluxDB database name";
+					};
 				};
 			};
 		};
@@ -45,6 +50,11 @@ in {
 			description = "ffsync";
 			after    = [ "influxdb.service" ];
 			wantedBy = [ "multi-user.target" ];
+			environment = {
+				FFSYNC_INFLUX_ADDRESS  = cfg.influx.address;
+				FFSYNC_INFLUX_TOKEN    = cfg.influx.token;
+				FFSYNC_INFLUX_DATABASE = cfg.influx.database;
+			};
 			serviceConfig = {
 				ExecStart = ''${cfg.package} \
 					${lib.escapeShellArg cfg.src} \
