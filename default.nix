@@ -13,5 +13,5 @@ pkgs.buildGoModule {
 
 	CGO_ENABLED = "0";
 
-	vendorSha256 = "0k36dz5y448nxvx9nh36qs8z9968knyalvhss6k1m67m2m0kqxjy";
+	vendorSha256 = "1x1igf9g5kq6dcf1xv9nji5x3iclcdh41p698w8sqpzjdjli3vbr";
 }
