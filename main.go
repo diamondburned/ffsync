@@ -20,10 +20,7 @@ import (
 
 func main() {
 	var config struct {
-		Influx struct {
-			Address string `env:"FFSYNC_INFLUX_ADDRESS"`
-			Token   string `env:"FFSYNC_INFLUX_TOKEN"`
-		}
+		Influx influx.Config
 
 		Formats   string `env:"FFSYNC_FORMATS"`
 		Frequency string `env:"FFSYNC_FREQUENCY"`
@@ -49,7 +46,7 @@ func main() {
 
 	var t telemetry.Telemeter
 	if config.Influx.Address != "" {
-		t = influx.NewClient(config.Influx.Address, config.Influx.Token)
+		t = influx.NewClient(config.Influx)
 	} else {
 		t = fallback.New()
 	}

@@ -10,7 +10,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-const Bucket = "ffsync"
+type Config struct {
+	Database string `env:"FFSYNC_INFLUX_DATABASE"` // default "ffsync"
+	Address  string `env:"FFSYNC_INFLUX_ADDRESS"`
+	Token    string `env:"FFSYNC_INFLUX_TOKEN"`
+}
 
 type Client struct {
 	influxdb2.Client
@@ -19,10 +23,14 @@ type Client struct {
 
 var _ telemetry.Telemeter = (*Client)(nil)
 
-func NewClient(addr, token string) *Client {
-	client := influxdb2.NewClient(addr, token)
+func NewClient(cfg Config) *Client {
+	client := influxdb2.NewClient(cfg.Address, cfg.Token)
 
-	return &Client{client, client.WriteApi("", Bucket)}
+	if cfg.Database == "" {
+		cfg.Database = "ffsync"
+	}
+
+	return &Client{client, client.WriteApi("", cfg.Database)}
 }
 
 func (c *Client) Error(err error) {
