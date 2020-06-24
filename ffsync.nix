@@ -8,11 +8,13 @@ in {
 	options.services.ffsync = {
 		src = mkOption {
 			type = types.str;
+			default = "";
 			description = "Source directory to watch";
 		};
 
 		dst = mkOption {
 			type = types.str;
+			default = "";
 			description = "Destination directory to convert to";
 		};
 
@@ -21,10 +23,12 @@ in {
 				options = {
 					address = mkOption {
 						type = types.str;
+						default = "";
 						description = "InfluxDB address";
 					};
 					token = mkOption {
 						type = types.str;
+						default = "";
 						description = "InfluxDB token";
 					};
 					database = mkOption {
