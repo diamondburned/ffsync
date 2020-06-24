@@ -10,6 +10,7 @@ type Exporter interface {
 type Extras = map[string]interface{}
 
 type Telemeter interface {
+	Close()
 	Error(err error)
 	WriteDuration(dura time.Duration, name string, attrs Extras)
 }

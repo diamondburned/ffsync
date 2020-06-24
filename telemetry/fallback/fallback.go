@@ -22,3 +22,5 @@ func (Client) Error(err error) {
 func (Client) WriteDuration(dura time.Duration, name string, attrs map[string]interface{}) {
 	log.Printf("%s took %v to complete; attrs: %+v\n", name, dura, attrs)
 }
+
+func (Client) Close() {}

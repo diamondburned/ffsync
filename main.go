@@ -26,7 +26,8 @@ func main() {
 		Frequency string `env:"FFSYNC_FREQUENCY"`
 	}
 
-	if _, err := env.UnmarshalFromEnviron(&config); err != nil {
+	_, err := env.UnmarshalFromEnviron(&config)
+	if err != nil {
 		log.Fatalln("Failed to load env:", err)
 	}
 
@@ -44,16 +45,21 @@ func main() {
 		wfreq = f
 	}
 
+	if len(os.Args) < 3 {
+		log.Fatalln("Invalid usage. Usage:", filepath.Base(os.Args[0]), "src dst")
+	}
+
 	var t telemetry.Telemeter
 	if config.Influx.Address != "" {
-		t = influx.NewClient(config.Influx)
+		t, err = influx.NewClient(config.Influx)
+		if err != nil {
+			log.Fatalln("InfluxDB error:", err)
+		}
 	} else {
 		t = fallback.New()
 	}
 
-	if len(os.Args) < 3 {
-		log.Fatalln("Invalid usage. Usage:", filepath.Base(os.Args[0]), "src dst")
-	}
+	defer t.Close()
 
 	a := &Application{
 		Telemeter: t,

@@ -1,6 +1,8 @@
 package influx
 
 import (
+	"context"
+	"log"
 	"time"
 
 	"github.com/diamondburned/ffsync/telemetry"
@@ -18,19 +20,27 @@ type Config struct {
 
 type Client struct {
 	influxdb2.Client
-	wr api.WriteApi
+	wr api.WriteApiBlocking
 }
 
 var _ telemetry.Telemeter = (*Client)(nil)
 
-func NewClient(cfg Config) *Client {
+func NewClient(cfg Config) (*Client, error) {
 	client := influxdb2.NewClient(cfg.Address, cfg.Token)
 
 	if cfg.Database == "" {
 		cfg.Database = "ffsync"
 	}
 
-	return &Client{client, client.WriteApi("", cfg.Database)}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	_, err := client.Health(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Client{client, client.WriteApiBlocking("", cfg.Database)}, nil
 }
 
 func (c *Client) Error(err error) {
@@ -63,7 +73,7 @@ func (c *Client) Error(err error) {
 		}
 	}
 
-	c.wr.WritePoint(write.NewPoint(name, nil, fields, now))
+	c.writePoint(write.NewPoint(name, nil, fields, now))
 }
 
 func (c *Client) WriteDuration(dura time.Duration, name string, attrs map[string]interface{}) {
@@ -75,5 +85,18 @@ func (c *Client) WriteDuration(dura time.Duration, name string, attrs map[string
 
 	attrs["duration"] = dura.Nanoseconds()
 
-	c.wr.WritePoint(write.NewPoint(name, nil, attrs, now))
+	c.writePoint(write.NewPoint(name, nil, attrs, now))
+}
+
+func (c *Client) writePoint(pt *write.Point) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	if err := c.wr.WritePoint(ctx, pt); err != nil {
+		log.Println("InfluxDB error: Error while writing point:", err)
+	}
+}
+
+func (c *Client) Close() {
+	c.Client.Close()
 }
