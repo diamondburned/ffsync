@@ -6,5 +6,10 @@ pkgs.buildGoModule {
 
 	src = ./.;
 
+	buildInputs = with pkgs; [
+		ffmpeg
+		opusTools
+	];
+
 	vendorSha256 = "0k36dz5y448nxvx9nh36qs8z9968knyalvhss6k1m67m2m0kqxjy";
 }
