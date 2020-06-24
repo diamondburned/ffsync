@@ -62,7 +62,7 @@ in {
 				FFSYNC_INFLUX_DATABASE = cfg.influx.database;
 			};
 			serviceConfig = {
-				ExecStart = ''${cfg.package} \
+				ExecStart = ''${cfg.package}/bin/ffsync \
 					${lib.escapeShellArg cfg.src} \
 					${lib.escapeShellArg cfg.dst}
 				'';
