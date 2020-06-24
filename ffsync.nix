@@ -61,6 +61,7 @@ in {
 				FFSYNC_INFLUX_TOKEN    = cfg.influx.token;
 				FFSYNC_INFLUX_DATABASE = cfg.influx.database;
 			};
+			path = with pkgs; [ ffmpeg opusTools ];
 			serviceConfig = {
 				ExecStart = ''${cfg.package}/bin/ffsync \
 					${lib.escapeShellArg cfg.src} \
