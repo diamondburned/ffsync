@@ -71,7 +71,6 @@ func main() {
 	if err != nil {
 		log.Fatalln("Failed to make a new syncer:", err)
 	}
-	s.Error = t.Error
 
 	if err := s.Start(wfreq); err != nil {
 		log.Fatalln("Failed to run syncer:", err)

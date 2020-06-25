@@ -15,10 +15,6 @@ func New() Client {
 	return Client{}
 }
 
-func (Client) Error(err error) {
-	log.Println(err)
-}
-
 func (Client) WriteDuration(dura time.Duration, name string, attrs map[string]interface{}) {
 	log.Printf("%s took %v to complete; attrs: %+v\n", name, dura, attrs)
 }

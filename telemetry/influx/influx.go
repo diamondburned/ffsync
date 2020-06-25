@@ -103,38 +103,6 @@ func writeBatch(c client.Client, b client.BatchPoints) {
 	}
 }
 
-func (c *Client) Error(err error) {
-	var now = time.Now()
-
-	var fields map[string]interface{}
-	var name = "error"
-
-	// See if we could also get some more info.
-	if exporter, ok := err.(telemetry.Exporter); ok {
-		attrs := exporter.Export()
-		fields = make(map[string]interface{}, len(attrs)+2)
-
-		for k, v := range attrs {
-			fields[k] = v
-		}
-	} else {
-		fields = make(map[string]interface{}, 2)
-	}
-
-	fields["error"] = err.Error()
-
-	// See if we could get a stack trace.
-	if st, ok := err.(interface{ StackTrace() errors.StackTrace }); ok {
-		if traces := st.StackTrace(); len(traces) > 0 {
-			// Grab the first in stack.
-			frame, _ := traces[0].MarshalText()
-			fields["caller"] = string(frame)
-		}
-	}
-
-	c.write(name, fields, now)
-}
-
 func (c *Client) WriteDuration(dura time.Duration, name string, attrs map[string]interface{}) {
 	var now = time.Now()
 
@@ -144,11 +112,7 @@ func (c *Client) WriteDuration(dura time.Duration, name string, attrs map[string
 
 	attrs["duration"] = dura.Nanoseconds()
 
-	c.write(name, attrs, now)
-}
-
-func (c *Client) write(name string, fields map[string]interface{}, time time.Time) {
-	p, err := client.NewPoint(name, nil, fields, time)
+	p, err := client.NewPoint(name, nil, attrs, now)
 	if err != nil {
 		log.Println("BUG: NewPoint errored out:", err)
 		return
