@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -44,7 +43,7 @@ func TestSyncer(t *testing.T) {
 	<-time.After(tick * 2)
 
 	// Wait until we have enough files, with a bit of overhead.
-	var timeout = time.After(tick * (prepared + 10))
+	var timeout = time.After(tick * (prepared * 2))
 
 	var converted = make([]string, 0, prepared)
 
@@ -55,7 +54,7 @@ FileLoop:
 			t.Log("Received", dst)
 			converted = append(converted, dst)
 
-			// If we have enough files received, then break out of the loop..
+			// If we have enough files received, then break out of the loop.
 			if len(converted) == prepared {
 				break FileLoop
 			}
@@ -121,15 +120,11 @@ FileLoop:
 	}
 
 	time.Sleep(2 * time.Second)
-
-	// Wait for everything to finish.
-	m.wg.Wait()
 }
 
 type mock struct {
 	converted chan string
 	src       string
-	wg        sync.WaitGroup
 }
 
 func newMock(t *testing.T, src string) *mock {
@@ -146,9 +141,6 @@ func newMock(t *testing.T, src string) *mock {
 }
 
 func (m *mock) ConvertCtx(ctx context.Context, src, dst string) error {
-	m.wg.Add(1)
-	defer m.wg.Done()
-
 	_, err := os.Create(dst)
 	if err != nil {
 		return err

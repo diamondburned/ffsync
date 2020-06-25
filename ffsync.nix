@@ -82,8 +82,6 @@ in {
 				KillMode    = "mixed";
 				KillSignal  = "SIGINT";
 				LimitNICE   = 3; # lowish
-				LimitNPROC  = 64;
-				LimitNOFILE = 128;
 				ReadWritePaths = cfg.dst;
 				NoNewPrivileges = true;
 				RemoveIPC  = true;

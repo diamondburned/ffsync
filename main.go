@@ -64,7 +64,6 @@ func main() {
 
 	a := &Application{
 		Telemeter: t,
-		OpusPool:  opus.NewPool(),
 	}
 
 	s, err := sync.New(os.Args[1], os.Args[2], fmts, a)
@@ -84,7 +83,6 @@ func main() {
 
 type Application struct {
 	Telemeter telemetry.Telemeter
-	OpusPool  *opus.Pool
 }
 
 func (a *Application) ConvertExt(name string) string {
@@ -94,7 +92,7 @@ func (a *Application) ConvertExt(name string) string {
 func (a *Application) ConvertCtx(ctx context.Context, src, dst string) error {
 	var now = time.Now()
 
-	o, err := a.OpusPool.ConvertCtx(ctx, src, dst)
+	o, err := opus.ConvertCtx(ctx, src, dst)
 	if err != nil {
 		return errors.Wrap(err, "Failed to convert")
 	}

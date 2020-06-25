@@ -5,11 +5,13 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/radovskyb/watcher"
+	"golang.org/x/sync/semaphore"
 )
 
 type Converter interface {
@@ -24,6 +26,7 @@ type Syncer struct {
 	path string
 	dest string
 	fmts []string
+	sema *semaphore.Weighted
 
 	Error func(err error)
 }
@@ -44,6 +47,7 @@ func New(src, dst string, filefmts []string, c Converter) (*Syncer, error) {
 		dest: dst,
 		path: a,
 		fmts: filefmts,
+		sema: semaphore.NewWeighted(int64(runtime.GOMAXPROCS(-1) * 2)),
 		Error: func(err error) {
 			log.Println("Error watching:", err)
 		},
@@ -110,7 +114,7 @@ func (s *Syncer) event(ev watcher.Event) {
 		// Well, we should only transcode a file.
 		if !ev.IsDir() {
 			// Free to interrupt.
-			go s.catch(s.transcode(ev.Path, s.trans(ev)), "transcode from create")
+			s.transcode(ev.Path, s.trans(ev))
 		}
 
 	case watcher.Move:
@@ -124,21 +128,28 @@ func (s *Syncer) event(ev watcher.Event) {
 	}
 }
 
-func (s *Syncer) transcode(src, dst string) error {
+func (s *Syncer) transcode(src, dst string) {
 	// See if the file already exists in the destination.
 	if _, err := os.Stat(dst); err == nil {
-		return nil
+		return
 	}
 
-	// 30 seconds timeout.
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	defer cancel()
+	// 10 minutes timeout.
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Minute)
 
-	if err := s.c.ConvertCtx(ctx, src, dst); err != nil {
-		return err
+	if err := s.sema.Acquire(ctx, 1); err != nil {
+		s.catch(err, "acquire ctx for transcode from create")
+		cancel()
+		return
 	}
 
-	return nil
+	go func() {
+		if err := s.c.ConvertCtx(ctx, src, dst); err != nil {
+			s.catch(err, "transcode from create")
+		}
+		s.sema.Release(1)
+		cancel()
+	}()
 }
 
 func (s *Syncer) pathchk(i os.FileInfo, abs string) error {

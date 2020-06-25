@@ -7,9 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
-
-	"golang.org/x/sync/semaphore"
 )
 
 func init() {
@@ -28,29 +25,6 @@ const (
 var (
 	vf = fmt.Sprintf("scale=-1:'min(%s,ih)'", CoverArtSz)
 )
-
-type Pool struct {
-	sema *semaphore.Weighted
-}
-
-func NewPool() *Pool {
-	return &Pool{
-		sema: semaphore.NewWeighted(int64(runtime.GOMAXPROCS(-1) * 2)),
-	}
-}
-
-func (p *Pool) Convert(src, dst string) (string, error) {
-	return p.ConvertCtx(context.Background(), src, dst)
-}
-
-func (p *Pool) ConvertCtx(ctx context.Context, src, dst string) (string, error) {
-	if err := p.sema.Acquire(ctx, 1); err != nil {
-		return "", err
-	}
-	defer p.sema.Release(1)
-
-	return ConvertCtx(ctx, src, dst)
-}
 
 func Convert(src, dst string) (string, error) {
 	return ConvertCtx(context.Background(), src, dst)
