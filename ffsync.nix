@@ -81,7 +81,7 @@ in {
 				Restart = "on-failure";
 				KillMode    = "mixed";
 				KillSignal  = "SIGINT";
-				LimitNICE   = 3; # lowish
+				LimitNICE   = 5; # lowish
 				ReadWritePaths = cfg.dst;
 				NoNewPrivileges = true;
 				RemoveIPC  = true;

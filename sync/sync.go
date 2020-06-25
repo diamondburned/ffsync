@@ -47,7 +47,7 @@ func New(src, dst string, filefmts []string, c Converter) (*Syncer, error) {
 		dest: dst,
 		path: a,
 		fmts: filefmts,
-		sema: semaphore.NewWeighted(int64(runtime.GOMAXPROCS(-1) * 2)),
+		sema: semaphore.NewWeighted(int64(runtime.GOMAXPROCS(-1))),
 		Error: func(err error) {
 			log.Println("Error watching:", err)
 		},
