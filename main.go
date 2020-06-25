@@ -113,6 +113,8 @@ func (a *Application) ConvertCtx(ctx context.Context, src, dst string) error {
 		"wrote_bytes":   enc.WroteBytes,
 		"bitrate":       enc.Bitrate,
 		"overhead":      enc.Overhead,
+		"src":           src,
+		"dst":           dst,
 	})
 
 	return nil

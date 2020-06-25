@@ -30,12 +30,12 @@ var (
 )
 
 type Pool struct {
-	sema semaphore.Weighted
+	sema *semaphore.Weighted
 }
 
 func NewPool() *Pool {
 	return &Pool{
-		sema: *semaphore.NewWeighted(int64(runtime.GOMAXPROCS(-1))),
+		sema: semaphore.NewWeighted(int64(runtime.GOMAXPROCS(-1) * 2)),
 	}
 }
 
@@ -84,6 +84,11 @@ func convertCtx(ctx context.Context, src, dst string) (string, error) {
 		"-c:v", "mjpeg", "-sws_flags", "lanczos", "-q:v", CoverArtQ, "-vf", vf, "-vsync", "0",
 		// Audio encoding options (FLAC to passthrough to opusenc)
 		"-c:a", "flac", "-compression_level", "0",
+		// Map all metadata to the FLAC container itself
+		"-map_metadata", "0",
+		// Remove Replaygain metadata because Opus fucks around with it
+		"-metadata", "replaygain_track_gain=",
+		"-metadata", "replaygain_album_gain=",
 		// stdout
 		"-",
 	)

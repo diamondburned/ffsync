@@ -81,7 +81,7 @@ in {
 				Restart = "on-failure";
 				KillMode    = "mixed";
 				KillSignal  = "SIGINT";
-				LimitNICE   = 5; # lowish
+				LimitNICE   = 3; # lowish
 				LimitNPROC  = 64;
 				LimitNOFILE = 128;
 				ReadWritePaths = cfg.dst;
