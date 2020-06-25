@@ -54,7 +54,7 @@ func New(src, dst string, filefmts []string, c Converter) (*Syncer, error) {
 	return s, nil
 }
 
-func (s *Syncer) Run(freq time.Duration) error {
+func (s *Syncer) Start(freq time.Duration) error {
 	// Prepare the destination directory.
 	if err := os.MkdirAll(s.dest, 0775); err != nil {
 		return errors.Wrap(err, "Failed to mkdir -p destination directory")
@@ -92,7 +92,8 @@ func (s *Syncer) Run(freq time.Duration) error {
 		return nil
 	})
 
-	return s.w.Start(freq)
+	go s.w.Start(freq)
+	return nil
 }
 
 func (s *Syncer) Close() error {
@@ -108,6 +109,7 @@ func (s *Syncer) event(ev watcher.Event) {
 		s.catch(os.MkdirAll(filepath.Dir(s.trans(ev)), 0775), "mkdir -p from create")
 		// Well, we should only transcode a file.
 		if !ev.IsDir() {
+			// Free to interrupt.
 			go s.catch(s.transcode(ev.Path, s.trans(ev)), "transcode from create")
 		}
 

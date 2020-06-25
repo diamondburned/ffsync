@@ -4,7 +4,7 @@ import "time"
 
 // Exporter is used for errors to extend.
 type Exporter interface {
-	Export() (name string, attrs map[string]string)
+	Export() (attrs map[string]string)
 }
 
 type Extras = map[string]interface{}

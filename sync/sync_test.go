@@ -35,18 +35,13 @@ func TestSyncer(t *testing.T) {
 		t.Error("Syncer error:", err)
 	}
 
-	var runerr = make(chan error)
-	go func() {
-		runerr <- s.Run(tick)
-	}()
+	if err := s.Start(tick); err != nil {
+		t.Fatal("Failed to start:", err)
+	}
 	defer s.Close()
 
-	select {
-	case err := <-runerr:
-		t.Fatal(err)
-	case <-time.After(tick * 2):
-		// probably no more errors.
-	}
+	// Idle for a bit.
+	<-time.After(tick * 2)
 
 	// Wait until we have enough files, with a bit of overhead.
 	var timeout = time.After(tick * (prepared + 10))

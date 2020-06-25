@@ -5,7 +5,6 @@ import (
 	"io"
 
 	"github.com/diamondburned/ffsync/telemetry"
-	"github.com/pkg/errors"
 )
 
 type FFmpegError struct {
@@ -24,9 +23,9 @@ func (err *FFmpegError) Wrap(wrapped error) error {
 	return err
 }
 
-func (err *FFmpegError) Export() (string, map[string]string) {
-	return "ffmpeg error", map[string]string{
-		"error":  err.wrapped.Error(),
+func (err *FFmpegError) Export() map[string]string {
+	return map[string]string{
+		"error":  "ffmpeg failed: " + err.Error(),
 		"stderr": err.stderr.String(),
 	}
 }
@@ -47,13 +46,13 @@ func (err *OpusencError) Error() string {
 }
 
 func (err *OpusencError) Wrap(wrapped error) error {
-	err.wrapped = errors.Wrap(wrapped, "opusenc failed")
+	err.wrapped = wrapped
 	return err
 }
 
-func (err *OpusencError) Export() (string, map[string]string) {
-	return "opusenc error", map[string]string{
-		"error":  err.Error(),
+func (err *OpusencError) Export() map[string]string {
+	return map[string]string{
+		"error":  "opusenc failed: " + err.Error(),
 		"stderr": err.stderr.String(),
 	}
 }

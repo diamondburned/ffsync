@@ -26,10 +26,15 @@ in {
 						default = "";
 						description = "InfluxDB address";
 					};
-					token = mkOption {
+					username = mkOption {
 						type = types.str;
 						default = "";
-						description = "InfluxDB token";
+						description = "InfluxDB username";
+					};
+					password = mkOption {
+						type = types.str;
+						default = "";
+						description = "InfluxDB password";
 					};
 					database = mkOption {
 						type = types.str;
@@ -54,8 +59,9 @@ in {
 			wantedBy = [ "multi-user.target" ];
 			environment = {
 				FFSYNC_INFLUX_ADDRESS  = cfg.influx.address;
-				FFSYNC_INFLUX_TOKEN    = cfg.influx.token;
 				FFSYNC_INFLUX_DATABASE = cfg.influx.database;
+				FFSYNC_INFLUX_USERNAME = cfg.influx.username;
+				FFSYNC_INFLUX_PASSWORD = cfg.influx.password;
 			};
 			path = with pkgs; [ ffmpeg opusTools ];
 			serviceConfig = {
@@ -65,6 +71,8 @@ in {
 				'';
 				Type = "simple";
 				Restart = "on-failure";
+				KillMode    = "mixed";
+				KillSignal  = "SIGINT";
 				LimitNICE   = 5; # lowish
 				LimitNPROC  = 64;
 				LimitNOFILE = 128;

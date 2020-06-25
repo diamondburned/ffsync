@@ -16,7 +16,7 @@ type Opusenc struct {
 	RuntimeRaw string `sfmatch:"Runtime: (.+$)"`
 
 	RealtimeMult float64 `sfmatch:"\\((.+)x realtime\\)"`
-	WroteBytes   uint64  `sfmatch:"Wrote: (\\d+) bytes"`
+	WroteBytes   int64   `sfmatch:"Wrote: (\\d+) bytes"`
 	Bitrate      float64 `sfmatch:"Bitrate: (.+) kbit/s \\(without overhead\\)"`
 	Overhead     float64 `sfmatch:"Overhead: (.+)% \\(container\\+metadata\\)"`
 }

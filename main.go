@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"time"
@@ -72,9 +73,14 @@ func main() {
 	}
 	s.Error = t.Error
 
-	if err := s.Run(wfreq); err != nil {
+	if err := s.Start(wfreq); err != nil {
 		log.Fatalln("Failed to run syncer:", err)
 	}
+	defer s.Close()
+
+	sig := make(chan os.Signal)
+	signal.Notify(sig, os.Interrupt)
+	<-sig
 }
 
 type Application struct {

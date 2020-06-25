@@ -1,46 +1,106 @@
 package influx
 
 import (
-	"context"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/diamondburned/ffsync/telemetry"
-	influxdb2 "github.com/influxdata/influxdb-client-go"
-	"github.com/influxdata/influxdb-client-go/api"
-	"github.com/influxdata/influxdb-client-go/api/write"
+	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/pkg/errors"
 )
 
 type Config struct {
 	Database string `env:"FFSYNC_INFLUX_DATABASE"` // default "ffsync"
 	Address  string `env:"FFSYNC_INFLUX_ADDRESS"`
-	Token    string `env:"FFSYNC_INFLUX_TOKEN"`
+	Username string `env:"FFSYNC_INFLUX_USERNAME"`
+	Password string `env:"FFSYNC_INFLUX_PASSWORD"`
+}
+
+func (c Config) batchPts() client.BatchPoints {
+	b, _ := client.NewBatchPoints(client.BatchPointsConfig{
+		Database: c.Database,
+	})
+	return b
 }
 
 type Client struct {
-	influxdb2.Client
-	wr api.WriteApiBlocking
+	cli client.Client
+	cfg Config
+	pts chan *client.Point
+	cls chan struct{}
+	wg  *sync.WaitGroup
 }
 
 var _ telemetry.Telemeter = (*Client)(nil)
 
 func NewClient(cfg Config) (*Client, error) {
-	client := influxdb2.NewClient(cfg.Address, cfg.Token)
+	c, err := client.NewHTTPClient(client.HTTPConfig{
+		Addr:     cfg.Address,
+		Username: cfg.Username,
+		Password: cfg.Password,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to make a new Influx client")
+	}
 
 	if cfg.Database == "" {
 		cfg.Database = "ffsync"
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	_, err := client.Health(ctx)
+	r, err := c.Query(client.NewQuery("CREATE DATABASE "+cfg.Database, "", ""))
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Failed to send query request")
+	}
+	if r.Err != "" {
+		return nil, errors.Wrap(r.Error(), "Failed to create database")
 	}
 
-	return &Client{client, client.WriteApiBlocking("", cfg.Database)}, nil
+	var pts = make(chan *client.Point)
+	var cls = make(chan struct{})
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		var ticker = time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		defer wg.Done()
+
+		var batch = cfg.batchPts()
+
+		for {
+			select {
+			case <-cls:
+				writeBatch(c, batch) // write before exiting
+				return
+			case <-ticker.C:
+				if len(batch.Points()) > 0 {
+					// Write the batch points in a goroutine.
+					writeBatch(c, batch)
+					// Make a new set of batch points.
+					batch = cfg.batchPts()
+				}
+			case p := <-pts:
+				// Add the point into the batch list.
+				batch.AddPoint(p)
+			}
+		}
+	}()
+
+	return &Client{
+		cli: c,
+		cfg: cfg,
+		pts: pts,
+		cls: cls,
+		wg:  &wg,
+	}, nil
+}
+
+func writeBatch(c client.Client, b client.BatchPoints) {
+	if err := c.Write(b); err != nil {
+		log.Println("InfluxDB: Failed to write batch points:", err)
+	}
 }
 
 func (c *Client) Error(err error) {
@@ -51,11 +111,10 @@ func (c *Client) Error(err error) {
 
 	// See if we could also get some more info.
 	if exporter, ok := err.(telemetry.Exporter); ok {
-		n, t := exporter.Export()
-		name = n
-		fields = make(map[string]interface{}, len(t))
+		attrs := exporter.Export()
+		fields = make(map[string]interface{}, len(attrs)+2)
 
-		for k, v := range t {
+		for k, v := range attrs {
 			fields[k] = v
 		}
 	} else {
@@ -73,7 +132,7 @@ func (c *Client) Error(err error) {
 		}
 	}
 
-	c.writePoint(write.NewPoint(name, nil, fields, now))
+	c.write(name, fields, now)
 }
 
 func (c *Client) WriteDuration(dura time.Duration, name string, attrs map[string]interface{}) {
@@ -85,18 +144,22 @@ func (c *Client) WriteDuration(dura time.Duration, name string, attrs map[string
 
 	attrs["duration"] = dura.Nanoseconds()
 
-	c.writePoint(write.NewPoint(name, nil, attrs, now))
+	c.write(name, attrs, now)
 }
 
-func (c *Client) writePoint(pt *write.Point) {
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-	defer cancel()
-
-	if err := c.wr.WritePoint(ctx, pt); err != nil {
-		log.Println("InfluxDB error: Error while writing point:", err)
+func (c *Client) write(name string, fields map[string]interface{}, time time.Time) {
+	p, err := client.NewPoint(name, nil, fields, time)
+	if err != nil {
+		log.Println("BUG: NewPoint errored out:", err)
+		return
 	}
+
+	c.pts <- p
 }
 
 func (c *Client) Close() {
-	c.Client.Close()
+	close(c.cls)
+	c.wg.Wait()
+	c.cli.Close()
+	close(c.pts)
 }
