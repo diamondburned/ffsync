@@ -52,6 +52,12 @@ in {
 	};
 
 	config = mkIf (cfg.src != "" && cfg.dst != "") {
+		users.users.ffsync = {
+			home       = cfg.dst;
+			group      = "nogroup";
+			createHome = true;
+		};
+
 		systemd.services.ffsync = {
 			description = "ffsync";
 			after    = [ "influxdb.service" ];
@@ -69,15 +75,21 @@ in {
 					${lib.escapeShellArg cfg.src} \
 					${lib.escapeShellArg cfg.dst}
 				'';
-				Type = "simple";
+				Type  = "simple";
+				User  = "ffsync";
+				Group = "nogroup";
 				Restart = "on-failure";
 				KillMode    = "mixed";
 				KillSignal  = "SIGINT";
 				LimitNICE   = 5; # lowish
 				LimitNPROC  = 64;
 				LimitNOFILE = 128;
-				DynamicUser = true;
 				ReadWritePaths = cfg.dst;
+				NoNewPrivileges = true;
+				RemoveIPC  = true;
+				PrivateTmp = true;
+				ProtectSystem = "strict";
+				ProtectHome = "read-only";
 			};
 		};
 	};
