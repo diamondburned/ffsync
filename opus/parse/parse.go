@@ -52,7 +52,7 @@ func parseDuration(dura string) (time.Duration, error) {
 
 	for _, word := range strings.Fields(dura) {
 		switch word {
-		case "hour", "hours":
+		case "hour", "hours", "hours,":
 			hours = time.Duration(i)
 
 		case "minute", "minutes":
