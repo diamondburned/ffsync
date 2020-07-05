@@ -79,9 +79,10 @@ in {
 				User  = "ffsync";
 				Group = "nogroup";
 				Restart = "on-failure";
-				KillMode    = "mixed";
-				KillSignal  = "SIGINT";
-				LimitNICE   = 5; # lowish
+				KillMode   = "mixed";
+				KillSignal = "SIGINT";
+				LimitNICE  = 5; # lowish
+				ReadOnlyPaths  = cfg.src;
 				ReadWritePaths = cfg.dst;
 				NoNewPrivileges = true;
 				RemoveIPC  = true;
