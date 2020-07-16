@@ -37,7 +37,7 @@ func main() {
 		fmts = strings.Split(config.Formats, ",")
 	}
 
-	var wfreq = 2 * time.Second
+	var wfreq = time.Minute
 	if config.Frequency != "" {
 		f, err := time.ParseDuration(config.Frequency)
 		if err != nil {

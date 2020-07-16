@@ -20,6 +20,8 @@ type Converter interface {
 }
 
 type Syncer struct {
+	Wait time.Duration // default 1 min
+
 	w *watcher.Watcher
 	c Converter
 
@@ -39,9 +41,11 @@ func New(src, dst string, filefmts []string, c Converter) (*Syncer, error) {
 	}
 
 	w := watcher.New()
+	w.Event = make(chan watcher.Event, 100) // buffered
 	w.FilterOps(watcher.Create, watcher.Move, watcher.Rename, watcher.Remove)
 
 	s := &Syncer{
+		Wait: time.Minute,
 		w:    w,
 		c:    c,
 		dest: dst,
@@ -134,25 +138,30 @@ func (s *Syncer) transcode(src, dst string) {
 		return
 	}
 
-	// 10 minutes timeout.
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Minute)
+	time.AfterFunc(s.Wait, func() {
+		// 10 minutes timeout.
+		ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Minute)
+		defer cancel()
 
-	if err := s.sema.Acquire(ctx, 1); err != nil {
-		s.catch(err, "acquire ctx for transcode from create")
-		cancel()
-		return
-	}
+		if err := s.sema.Acquire(ctx, 1); err != nil {
+			s.catch(err, "acquire ctx for transcode from create")
+			return
+		}
 
-	go func() {
 		if err := s.c.ConvertCtx(ctx, src, dst); err != nil {
 			s.catch(err, "transcode from create")
 		}
+
 		s.sema.Release(1)
-		cancel()
-	}()
+	})
 }
 
 func (s *Syncer) pathchk(i os.FileInfo, abs string) error {
+	// Skip hidden files and directories.
+	if strings.HasPrefix(filepath.Base(abs), ".") {
+		return watcher.ErrSkip
+	}
+
 	// Allow directories.
 	if i.IsDir() {
 		return nil
