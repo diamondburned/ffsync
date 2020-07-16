@@ -20,8 +20,6 @@ type Converter interface {
 }
 
 type Syncer struct {
-	Wait time.Duration // default 1 min
-
 	w *watcher.Watcher
 	c Converter
 
@@ -45,7 +43,6 @@ func New(src, dst string, filefmts []string, c Converter) (*Syncer, error) {
 	w.FilterOps(watcher.Create, watcher.Move, watcher.Rename, watcher.Remove)
 
 	s := &Syncer{
-		Wait: time.Minute,
 		w:    w,
 		c:    c,
 		dest: dst,
@@ -112,6 +109,8 @@ func (s *Syncer) Close() error {
 func (s *Syncer) event(ev watcher.Event) {
 	switch ev.Op {
 	case watcher.Create:
+		log.Println("Created at", ev.Path)
+
 		// Since there might be a race condition between events being sent,
 		// we're best ensuring a directory is made before every single file.
 		s.catch(os.MkdirAll(filepath.Dir(s.trans(ev)), 0775), "mkdir -p from create")
@@ -122,12 +121,15 @@ func (s *Syncer) event(ev watcher.Event) {
 		}
 
 	case watcher.Move:
+		log.Println("Moved from", ev.OldPath, "to", ev.Path)
 		s.catch(os.Rename(s.pair(ev)), "rename from move")
 
 	case watcher.Rename:
+		log.Println("Renamed from", ev.OldPath, "to", ev.Path)
 		s.catch(os.Rename(s.pair(ev)), "rename from rename")
 
 	case watcher.Remove:
+		log.Println("Removed", ev.Path)
 		s.catch(os.RemoveAll(s.trans(ev)), "rm -r from remove")
 	}
 }
@@ -138,22 +140,23 @@ func (s *Syncer) transcode(src, dst string) {
 		return
 	}
 
-	time.AfterFunc(s.Wait, func() {
+	// Allow queueing indefinitely.
+	if err := s.sema.Acquire(context.TODO(), 1); err != nil {
+		s.catch(err, "acquire ctx for transcode from create")
+		return
+	}
+
+	go func() {
 		// 10 minutes timeout.
 		ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Minute)
 		defer cancel()
-
-		if err := s.sema.Acquire(ctx, 1); err != nil {
-			s.catch(err, "acquire ctx for transcode from create")
-			return
-		}
 
 		if err := s.c.ConvertCtx(ctx, src, dst); err != nil {
 			s.catch(err, "transcode from create")
 		}
 
 		s.sema.Release(1)
-	})
+	}()
 }
 
 func (s *Syncer) pathchk(i os.FileInfo, abs string) error {
