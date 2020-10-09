@@ -54,7 +54,7 @@ in {
 	config = mkIf (cfg.src != "" && cfg.dst != "") {
 		users.users.ffsync = {
 			home       = cfg.dst;
-			group      = "nogroup";
+			group      = "users";
 			createHome = true;
 		};
 
@@ -77,7 +77,7 @@ in {
 				'';
 				Type  = "simple";
 				User  = "ffsync";
-				Group = "nogroup";
+				Group = "users";
 				Restart = "on-failure";
 				KillMode   = "mixed";
 				KillSignal = "SIGINT";
