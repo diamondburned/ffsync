@@ -5,13 +5,12 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
+	"github.com/diamondburned/ffsync/internal/osutil"
 	"github.com/pkg/errors"
 	"github.com/radovskyb/watcher"
-	"golang.org/x/sync/semaphore"
 )
 
 type Converter interface {
@@ -25,13 +24,12 @@ type Syncer struct {
 
 	path string
 	dest string
-	fmts []string
-	sema *semaphore.Weighted
+	opts Options
 
 	Error func(err error)
 }
 
-func New(src, dst string, filefmts []string, c Converter) (*Syncer, error) {
+func New(src, dst string, opts Options, c Converter) (*Syncer, error) {
 	// Get the source path as an absolute one.
 	a, err := filepath.Abs(src)
 	if err != nil {
@@ -47,14 +45,13 @@ func New(src, dst string, filefmts []string, c Converter) (*Syncer, error) {
 		c:    c,
 		dest: dst,
 		path: a,
-		fmts: filefmts,
-		sema: semaphore.NewWeighted(int64(runtime.GOMAXPROCS(-1) / 2)),
+		opts: opts,
 		Error: func(err error) {
 			log.Println("Error watching:", err)
 		},
 	}
 
-	w.AddFilterHook(s.pathchk)
+	w.AddFilterHook(s.checkPath)
 
 	return s, nil
 }
@@ -85,7 +82,7 @@ func (s *Syncer) Start(freq time.Duration) error {
 	// Catch up on non-encoded files.
 	go filepath.Walk(s.path, func(path string, info os.FileInfo, err error) error {
 		// Manually check if this is the right file.
-		if s.pathchk(info, path) != nil {
+		if s.checkPath(info, path) != nil {
 			return nil
 		}
 		// Send the event into the event channel.
@@ -134,32 +131,35 @@ func (s *Syncer) event(ev watcher.Event) {
 	}
 }
 
-func (s *Syncer) transcode(src, dst string) {
+func (s *Syncer) OnCreate(src, dst string) {
 	// See if the file already exists in the destination.
 	if _, err := os.Stat(dst); err == nil {
 		return
 	}
 
-	// Allow queueing indefinitely.
-	if err := s.sema.Acquire(context.TODO(), 1); err != nil {
-		s.catch(err, "acquire ctx for transcode from create")
-		return
+	switch s.opts.action(filepath.Ext(src)) {
+	case copyAction:
+		go s.copy(src, dst)
+	case convertAction:
+		go s.transcode(src, dst)
 	}
-
-	go func() {
-		// 10 minutes timeout.
-		ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Minute)
-		defer cancel()
-
-		if err := s.c.ConvertCtx(ctx, src, dst); err != nil {
-			s.catch(err, "transcode from create")
-		}
-
-		s.sema.Release(1)
-	}()
 }
 
-func (s *Syncer) pathchk(i os.FileInfo, abs string) error {
+func (s *Syncer) copy(src, dst string) {
+	s.catch(osutil.Copy(src, dst), "failed to copy")
+}
+
+func (s *Syncer) transcode(src, dst string) {
+	// 10 minutes timeout.
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Minute)
+	defer cancel()
+
+	if err := s.c.ConvertCtx(ctx, src, dst); err != nil {
+		s.catch(err, "transcode from create")
+	}
+}
+
+func (s *Syncer) checkPath(i os.FileInfo, abs string) error {
 	// Skip hidden files and directories.
 	if strings.HasPrefix(filepath.Base(abs), ".") {
 		return watcher.ErrSkip
@@ -171,12 +171,8 @@ func (s *Syncer) pathchk(i os.FileInfo, abs string) error {
 	}
 
 	// Allow whitelisted file extensions prefixed with a dot (.)
-	var ext = filepath.Ext(abs)
-
-	for _, fmt := range s.fmts {
-		if fmt == ext {
-			return nil
-		}
+	if s.opts.IsExt(filepath.Ext(abs)) {
+		return nil
 	}
 
 	// Skip if neither matched.

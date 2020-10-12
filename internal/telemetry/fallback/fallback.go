@@ -4,7 +4,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/diamondburned/ffsync/telemetry"
+	"github.com/diamondburned/ffsync/internal/telemetry"
 )
 
 type Client struct{}

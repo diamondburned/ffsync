@@ -5,9 +5,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/diamondburned/ffsync/telemetry"
-	client "github.com/influxdata/influxdb1-client/v2"
+	"github.com/diamondburned/ffsync/internal/telemetry"
 	"github.com/pkg/errors"
+
+	client "github.com/influxdata/influxdb1-client/v2"
 )
 
 type Config struct {

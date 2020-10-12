@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diamondburned/ffsync/opus"
+	"github.com/diamondburned/ffsync/ffmpeg"
 )
 
 const prepared = 25
@@ -158,7 +158,7 @@ func (m *mock) ConvertCtx(ctx context.Context, src, dst string) error {
 }
 
 func (m *mock) ConvertExt(name string) string {
-	return opus.ConvertExt(name, "converted")
+	return ffmpeg.ConvertExt(name, "converted")
 }
 
 func mktmpdir(t *testing.T) string {
