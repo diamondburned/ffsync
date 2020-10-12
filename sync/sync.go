@@ -1,7 +1,6 @@
 package sync
 
 import (
-	"context"
 	"log"
 	"os"
 	"path/filepath"
@@ -11,11 +10,11 @@ import (
 	"github.com/diamondburned/ffsync/internal/osutil"
 	"github.com/pkg/errors"
 	"github.com/radovskyb/watcher"
-	"golang.org/x/sync/semaphore"
 )
 
 type Converter interface {
-	ConvertCtx(ctx context.Context, src, dst string) error
+	QueueCopy(src, dst string)
+	QueueConvert(src, dst string)
 	ConvertExt(name string) string
 }
 
@@ -26,8 +25,6 @@ type Syncer struct {
 	path string
 	dest string
 	opts Options
-
-	Error func(err error)
 }
 
 func New(src, dst string, opts Options, c Converter) (*Syncer, error) {
@@ -47,9 +44,6 @@ func New(src, dst string, opts Options, c Converter) (*Syncer, error) {
 		dest: dst,
 		path: a,
 		opts: opts,
-		Error: func(err error) {
-			log.Println("Error watching:", err)
-		},
 	}
 
 	w.AddFilterHook(s.checkPath)
@@ -69,7 +63,7 @@ func (s *Syncer) Start(freq time.Duration) error {
 			case ev := <-s.w.Event:
 				s.event(ev)
 			case err := <-s.w.Error:
-				s.Error(err)
+				s.opts.ErrorLog(err)
 			case <-s.w.Closed:
 				return
 			}
@@ -107,28 +101,32 @@ func (s *Syncer) Close() error {
 func (s *Syncer) event(ev watcher.Event) {
 	switch ev.Op {
 	case watcher.Create:
-		log.Println("Created at", ev.Path)
+		dst := s.trans(ev)
+		log.Println("Created at", dst)
 
 		// Since there might be a race condition between events being sent,
 		// we're best ensuring a directory is made before every single file.
-		s.catch(os.MkdirAll(filepath.Dir(s.trans(ev)), 0775), "mkdir -p from create")
+		s.catch(os.MkdirAll(filepath.Dir(dst), 0775), "mkdir -p from create")
 		// Well, we should only transcode a file.
 		if !ev.IsDir() {
 			// Free to interrupt.
-			s.OnCreate(ev.Path, s.trans(ev))
+			s.OnCreate(ev.Path, dst)
 		}
 
 	case watcher.Move:
-		log.Println("Moved from", ev.OldPath, "to", ev.Path)
-		s.catch(os.Rename(s.pair(ev)), "rename from move")
+		src, dst := s.pair(ev)
+		log.Println("Moved from", src, "to", dst)
+		s.catch(osutil.MoveTimeout(time.Minute, src, dst), "mv")
 
 	case watcher.Rename:
-		log.Println("Renamed from", ev.OldPath, "to", ev.Path)
+		src, dst := s.pair(ev)
+		log.Println("Renamed from", src, "to", dst)
 		s.catch(os.Rename(s.pair(ev)), "rename from rename")
 
 	case watcher.Remove:
-		log.Println("Removed", ev.Path)
-		s.catch(os.RemoveAll(s.trans(ev)), "rm -r from remove")
+		dst := s.trans(ev)
+		log.Println("Removed", dst)
+		s.catch(osutil.RemoveAllIfEmpty(ev.Path, dst), "rm -r from remove")
 	}
 }
 
@@ -140,36 +138,9 @@ func (s *Syncer) OnCreate(src, dst string) {
 
 	switch s.opts.action(filepath.Ext(src)) {
 	case copyAction:
-		go s.copy(src, dst)
+		s.c.QueueCopy(src, dst)
 	case convertAction:
-		go s.transcode(src, dst)
-	}
-}
-
-var copySema = semaphore.NewWeighted(64)
-
-func (s *Syncer) copy(src, dst string) {
-	// 10 minutes timeout.
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Minute)
-	defer cancel()
-
-	if err := copySema.Acquire(ctx, 1); err != nil {
-		s.catch(err, "failed to acquire copy sema")
-		return
-	}
-
-	defer copySema.Release(1)
-
-	s.catch(osutil.Copy(src, dst), "failed to copy")
-}
-
-func (s *Syncer) transcode(src, dst string) {
-	// 10 minutes timeout.
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Minute)
-	defer cancel()
-
-	if err := s.c.ConvertCtx(ctx, src, dst); err != nil {
-		s.catch(err, "transcode from create")
+		s.c.QueueConvert(src, dst)
 	}
 }
 
@@ -218,6 +189,6 @@ func (s *Syncer) pair(ev watcher.Event) (string, string) {
 
 func (s *Syncer) catch(err error, failedTo string) {
 	if err != nil {
-		s.Error(errors.Wrap(err, "Failed to "+failedTo))
+		s.opts.ErrorLog(errors.Wrap(err, "Failed to "+failedTo))
 	}
 }

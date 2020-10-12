@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -13,11 +14,12 @@ import (
 	"github.com/diamondburned/ffsync/ffmpeg"
 	"github.com/diamondburned/ffsync/ffmpeg/cover"
 	"github.com/diamondburned/ffsync/ffmpeg/opus"
+	"github.com/diamondburned/ffsync/internal/osutil"
 	"github.com/diamondburned/ffsync/internal/telemetry"
 	"github.com/diamondburned/ffsync/internal/telemetry/fallback"
 	"github.com/diamondburned/ffsync/internal/telemetry/influx"
 	"github.com/diamondburned/ffsync/sync"
-	"github.com/pkg/errors"
+	"golang.org/x/sync/semaphore"
 )
 
 func main() {
@@ -37,6 +39,9 @@ func main() {
 	var cfg = sync.Options{
 		FileFormats: []string{".mp3", ".flac", ".aac", ".ogg", ".opus"},
 		CopyFormats: []string{".jpg", ".jpeg", ".png"},
+		ErrorLog: func(err error) {
+			log.Println("[sync]", err)
+		},
 	}
 
 	if config.Formats != "" {
@@ -72,7 +77,9 @@ func main() {
 	defer t.Close()
 
 	a := &Application{
-		Telemeter: t,
+		Telemeter:       t,
+		CopySemaphore:   *semaphore.NewWeighted(64),
+		FFmpegSemaphore: *semaphore.NewWeighted(int64(runtime.GOMAXPROCS(-1))),
 	}
 
 	s, err := sync.New(os.Args[1], os.Args[2], cfg, a)
@@ -91,56 +98,52 @@ func main() {
 }
 
 type Application struct {
-	Telemeter telemetry.Telemeter
+	Telemeter       telemetry.Telemeter
+	CopySemaphore   semaphore.Weighted
+	FFmpegSemaphore semaphore.Weighted
 }
 
 func (a *Application) ConvertExt(name string) string {
 	return ffmpeg.ConvertExt(name, "opus")
 }
 
-func (a *Application) ConvertCtx(ctx context.Context, src, dst string) (err error) {
+func (a *Application) QueueCopy(src, dst string) {
+	semaJob(time.Minute, &a.CopySemaphore, func(ctx context.Context) {
+		if err := osutil.Copy(ctx, src, dst); err != nil {
+			log.Println("[copy]", err)
+		}
+	})
+}
+
+func (a *Application) QueueConvert(src, dst string) {
 	// Only derive the album art if the cover does not exist.
 	if _, exists := cover.ExistsAlbum(dst); !exists {
-		var done = make(chan error, 1)
-
-		// On function exit, wait for the ExtractAlbum goroutine to finish.
-		defer func() {
-			// Only use cover's error if opus' error is nil.
-			if coverErr := <-done; err != nil {
-				err = coverErr
-			}
-		}()
-
-		// Extract the album art in another goroutine.
-		go func() {
-			var coverErr error
-			defer func() { done <- coverErr }()
-
+		semaJob(time.Minute, &a.FFmpegSemaphore, func(ctx context.Context) {
 			coverSubmitter := a.submitter(src, "cover")
 
 			o, err := cover.ExtractAlbum(ctx, src, dst)
 			if err != nil {
 				if !cover.ErrIsNoStream(err) {
-					coverErr = errors.Wrap(err, "failed to extract album art")
+					log.Println("[cover] failed to extract album art:", err)
 				}
 				return
 			}
 
 			coverSubmitter(o)
-		}()
+		})
 	}
 
-	opusSubmitter := a.submitter(src, "opus")
+	semaJob(10*time.Minute, &a.FFmpegSemaphore, func(ctx context.Context) {
+		opusSubmitter := a.submitter(src, "opus")
 
-	o, err := opus.ConvertCtx(ctx, src, dst)
-	if err != nil {
-		err = errors.Wrap(err, "failed to convert")
-		return
-	}
+		o, err := opus.ConvertCtx(ctx, src, dst)
+		if err != nil {
+			log.Println("[opus] failed to convert:", err)
+			return
+		}
 
-	opusSubmitter(o)
-
-	return nil
+		opusSubmitter(o)
+	})
 }
 
 func (a *Application) submitter(src, rType string) func(*ffmpeg.Result) {
@@ -163,4 +166,23 @@ func (a *Application) submitter(src, rType string) func(*ffmpeg.Result) {
 			"dst":           result.OutputPath,
 		})
 	}
+}
+
+// semaJob blocks until a semaphore is acquired, then runs fn in a goroutine.
+func semaJob(t time.Duration, sema *semaphore.Weighted, fn func(context.Context)) {
+	// 1 minute timeout.
+	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
+
+	if err := sema.Acquire(ctx, 1); err != nil {
+		log.Println("[copy] failed to acquire sema")
+		cancel()
+		return
+	}
+
+	go func() {
+		defer cancel()
+		defer sema.Release(1)
+
+		fn(ctx)
+	}()
 }

@@ -6,15 +6,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
-	"golang.org/x/sync/semaphore"
 )
-
-var sema = semaphore.NewWeighted(int64(runtime.GOMAXPROCS(-1)))
 
 func init() {
 	for _, arg0 := range []string{"ffmpeg"} {
@@ -78,24 +74,18 @@ func executeCtx(ctx context.Context, src, dst string, args ...string) (*Result, 
 	cmd := exec.CommandContext(ctx, "ffmpeg", ffmpegArgs...)
 	cmd.Env = append(os.Environ(), "AV_LOG_FORCE_NOCOLOR=0") // force no color
 
+	// Use a custom local stderr buffer.
+	ffmpegErr := Error{}
+	cmd.Stderr = ffmpegErr.Stderr()
+
 	o, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to open stdout pipe")
 	}
 	defer o.Close()
 
-	// Use a custom local stderr buffer.
-	ffmpegErr := Error{}
-	cmd.Stderr = ffmpegErr.Stderr()
-
 	var progress Progress
 	var now = time.Now()
-
-	if err := sema.Acquire(ctx, 1); err != nil {
-		return nil, errors.Wrap(err, "failed to acquire job semaphore")
-	}
-
-	defer sema.Release(1)
 
 	if err := cmd.Start(); err != nil {
 		return nil, ffmpegErr.Wrap(err)

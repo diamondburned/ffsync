@@ -11,6 +11,8 @@ const (
 type Options struct {
 	FileFormats []string // to transcode
 	CopyFormats []string // to copy
+
+	ErrorLog func(err error)
 }
 
 func (o Options) IsExt(ext string) bool {
