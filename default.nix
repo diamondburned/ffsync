@@ -8,7 +8,6 @@ pkgs.buildGoModule {
 
 	buildInputs = with pkgs; [
 		ffmpeg
-		opusTools
 	];
 
 	CGO_ENABLED = "0";

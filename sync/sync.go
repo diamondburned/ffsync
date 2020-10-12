@@ -11,6 +11,7 @@ import (
 	"github.com/diamondburned/ffsync/internal/osutil"
 	"github.com/pkg/errors"
 	"github.com/radovskyb/watcher"
+	"golang.org/x/sync/semaphore"
 )
 
 type Converter interface {
@@ -114,7 +115,7 @@ func (s *Syncer) event(ev watcher.Event) {
 		// Well, we should only transcode a file.
 		if !ev.IsDir() {
 			// Free to interrupt.
-			s.transcode(ev.Path, s.trans(ev))
+			s.OnCreate(ev.Path, s.trans(ev))
 		}
 
 	case watcher.Move:
@@ -145,7 +146,20 @@ func (s *Syncer) OnCreate(src, dst string) {
 	}
 }
 
+var copySema = semaphore.NewWeighted(512)
+
 func (s *Syncer) copy(src, dst string) {
+	// 10 minutes timeout.
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Minute)
+	defer cancel()
+
+	if err := copySema.Acquire(ctx, 1); err != nil {
+		s.catch(err, "failed to acquire copy sema")
+		return
+	}
+
+	defer copySema.Release(1)
+
 	s.catch(osutil.Copy(src, dst), "failed to copy")
 }
 
