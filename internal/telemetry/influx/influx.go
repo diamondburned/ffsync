@@ -57,7 +57,7 @@ func NewClient(cfg Config) (*Client, error) {
 		return nil, errors.Wrap(r.Error(), "Failed to create database")
 	}
 
-	var pts = make(chan *client.Point)
+	var pts = make(chan *client.Point, 25)
 	var cls = make(chan struct{})
 
 	wg := sync.WaitGroup{}
@@ -104,7 +104,7 @@ func writeBatch(c client.Client, b client.BatchPoints) {
 	}
 }
 
-func (c *Client) WriteDuration(dura time.Duration, name string, attrs map[string]interface{}) {
+func (c *Client) WriteDuration(dura time.Duration, name string, attrs telemetry.Extras) {
 	var now = time.Now()
 
 	if attrs == nil {

@@ -152,10 +152,6 @@ func (a *Application) submitter(src, rType string) func(*ffmpeg.Result) {
 	return func(result *ffmpeg.Result) {
 		var dura = time.Now().Sub(now)
 
-		if result.Progress.Progress != ffmpeg.ProgressEnd {
-			return
-		}
-
 		a.Telemeter.WriteDuration(dura, "convert", telemetry.Extras{
 			"encoded":       result.OutDuration().Milliseconds(),
 			"runtime":       result.Runtime.Milliseconds(),

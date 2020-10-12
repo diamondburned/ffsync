@@ -15,7 +15,7 @@ func New() Client {
 	return Client{}
 }
 
-func (Client) WriteDuration(dura time.Duration, name string, attrs map[string]interface{}) {
+func (Client) WriteDuration(dura time.Duration, name string, attrs telemetry.Extras) {
 	log.Printf("%s took %v to complete; attrs: %+v\n", name, dura, attrs)
 }
 
