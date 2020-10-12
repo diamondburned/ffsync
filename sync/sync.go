@@ -146,7 +146,7 @@ func (s *Syncer) OnCreate(src, dst string) {
 	}
 }
 
-var copySema = semaphore.NewWeighted(512)
+var copySema = semaphore.NewWeighted(64)
 
 func (s *Syncer) copy(src, dst string) {
 	// 10 minutes timeout.

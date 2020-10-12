@@ -40,7 +40,7 @@ func FileIsExt(file string, ext string) bool {
 var ErrInvalidFileFormat = errors.New("invalid file format")
 
 var defaultArgs = []string{
-	"-loglevel", "warning", "-hide_banner", "-threads", "1",
+	"-loglevel", "warning", "-hide_banner", "-threads", "1", "-y", // force yes
 }
 
 type Result struct {
@@ -57,11 +57,12 @@ func ExecuteCtx(ctx context.Context, src, dst string, args ...string) (*Result, 
 	tmpdst := filepath.Join(filepath.Dir(dst), "."+filepath.Base(dst))
 
 	// Convert and write to that temp file.
-	p, err := executeCtx(ctx, src, dst, args...)
+	p, err := executeCtx(ctx, src, tmpdst, args...)
 	if err != nil {
 		os.Remove(tmpdst)
 		return nil, err
 	}
+	p.OutputPath = dst
 
 	// Atomically rename that temp file to the intended destination.
 	return p, os.Rename(tmpdst, dst)
@@ -110,8 +111,7 @@ func executeCtx(ctx context.Context, src, dst string, args ...string) (*Result, 
 	}
 
 	return &Result{
-		Progress:   progress,
-		Runtime:    time.Now().Sub(now),
-		OutputPath: dst,
+		Progress: progress,
+		Runtime:  time.Now().Sub(now),
 	}, nil
 }
