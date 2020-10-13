@@ -1,11 +1,12 @@
 package ffmpeg
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
 
-const testOutput = `bitrate= 104.4kbits/s
+const testOutput = `bitrate= 104.0kbits/s
 total_size=1048576
 out_time_us=80313500
 out_time_ms=80313500
@@ -14,7 +15,7 @@ dup_frames=0
 drop_frames=0
 speed=40.1x
 progress=continue
-bitrate= 129.5kbits/s
+bitrate= 29.5kbits/s
 total_size=1357046
 out_time_us=83853500
 out_time_ms=83853500
@@ -28,7 +29,7 @@ progress=end
 func TestParseOutput(t *testing.T) {
 	var outputs = []Progress{
 		{
-			Bitrate:    104.4,
+			Bitrate:    104.0,
 			TotalSize:  1048576,
 			OutTimeus:  80313500,
 			DupFrames:  0,
@@ -37,7 +38,7 @@ func TestParseOutput(t *testing.T) {
 			Progress:   ProgressContinue,
 		},
 		{
-			Bitrate:    129.5,
+			Bitrate:    29.5,
 			TotalSize:  1357046,
 			OutTimeus:  83853500,
 			DupFrames:  0,
@@ -50,7 +51,7 @@ func TestParseOutput(t *testing.T) {
 	var index int
 
 	r, err := parseOutput(strings.NewReader(testOutput), func(p Progress) {
-		if p != outputs[index] {
+		if !reflect.DeepEqual(p, outputs[index]) {
 			t.Errorf("Mismatch:\nExpect:\t\t%#v\nGot:\t\t%#v", p, outputs[index])
 		}
 

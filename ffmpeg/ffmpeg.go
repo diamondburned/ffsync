@@ -36,7 +36,11 @@ func FileIsExt(file string, ext string) bool {
 var ErrInvalidFileFormat = errors.New("invalid file format")
 
 var defaultArgs = []string{
-	"-loglevel", "warning", "-hide_banner", "-threads", "1", "-y", // force yes
+	"-hide_banner",
+	"-threads", "1",
+	"-progress", "-",
+	"-loglevel", "warning",
+	"-y", // force yes
 }
 
 type Result struct {
