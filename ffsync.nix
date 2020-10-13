@@ -69,7 +69,7 @@ in {
 				FFSYNC_INFLUX_USERNAME = cfg.influx.username;
 				FFSYNC_INFLUX_PASSWORD = cfg.influx.password;
 			};
-			path = with pkgs; [ ffmpeg opusTools ];
+			path = with pkgs; [ ffmpeg ];
 			serviceConfig = {
 				ExecStart = ''${cfg.package}/bin/ffsync \
 					${lib.escapeShellArg cfg.src} \
@@ -79,7 +79,7 @@ in {
 				User  = "ffsync";
 				Group = "users";
 				Restart = "on-failure";
-				KillMode    = "mixed";
+				KillMode    = "control-group";
 				KillSignal  = "SIGINT";
 				LimitNICE   = 5; # lowish
 				LimitNOFILE = 1024;

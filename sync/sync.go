@@ -3,6 +3,7 @@ package sync
 import (
 	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"time"
@@ -35,7 +36,7 @@ func New(src, dst string, opts Options, c Converter) (*Syncer, error) {
 	}
 
 	w := watcher.New()
-	w.Event = make(chan watcher.Event, 100) // buffered
+	w.Event = make(chan watcher.Event, 2) // buffered
 	w.FilterOps(watcher.Create, watcher.Move, watcher.Rename, watcher.Remove)
 
 	s := &Syncer{
@@ -51,28 +52,19 @@ func New(src, dst string, opts Options, c Converter) (*Syncer, error) {
 	return s, nil
 }
 
-func (s *Syncer) Start(freq time.Duration) error {
+// Run starts the watcher and the main loop. It blocks forever. An error is
+// returned prematurely, if there is one.
+func (s *Syncer) Run(freq time.Duration) error {
 	// Prepare the destination directory.
 	if err := os.MkdirAll(s.dest, 0775); err != nil {
 		return errors.Wrap(err, "Failed to mkdir -p destination directory")
 	}
 
-	go func() {
-		for {
-			select {
-			case ev := <-s.w.Event:
-				s.event(ev)
-			case err := <-s.w.Error:
-				s.opts.ErrorLog(err)
-			case <-s.w.Closed:
-				return
-			}
-		}
-	}()
-
 	if err := s.w.AddRecursive(s.path); err != nil {
 		return errors.Wrap(err, "Failed to add src recursively")
 	}
+
+	defer s.close()
 
 	// Catch up on non-encoded files.
 	go filepath.Walk(s.path, func(path string, info os.FileInfo, err error) error {
@@ -90,10 +82,25 @@ func (s *Syncer) Start(freq time.Duration) error {
 	})
 
 	go s.w.Start(freq)
-	return nil
+
+	sig := make(chan os.Signal)
+	signal.Notify(sig, os.Interrupt)
+
+	for {
+		select {
+		case ev := <-s.w.Event:
+			s.event(ev)
+		case err := <-s.w.Error:
+			s.opts.ErrorLog(err)
+		case <-s.w.Closed:
+			return nil
+		case <-sig:
+			return nil
+		}
+	}
 }
 
-func (s *Syncer) Close() error {
+func (s *Syncer) close() error {
 	s.w.Close()
 	return nil
 }

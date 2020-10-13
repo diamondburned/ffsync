@@ -35,7 +35,7 @@ type Client struct {
 
 var _ telemetry.Telemeter = (*Client)(nil)
 
-func NewClient(cfg Config) (*Client, error) {
+func NewClient(cfg Config) (telemetry.Telemeter, error) {
 	c, err := client.NewHTTPClient(client.HTTPConfig{
 		Addr:     cfg.Address,
 		Username: cfg.Username,

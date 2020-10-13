@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -64,14 +63,13 @@ func main() {
 		log.Fatalln("Invalid usage. Usage:", filepath.Base(os.Args[0]), "src dst")
 	}
 
-	var t telemetry.Telemeter
+	var t = fallback.New()
 	if config.Influx.Address != "" {
-		t, err = influx.NewClient(config.Influx)
+		client, err := influx.NewClient(config.Influx)
 		if err != nil {
 			log.Fatalln("InfluxDB error:", err)
 		}
-	} else {
-		t = fallback.New()
+		t = telemetry.Batch(t, client)
 	}
 
 	defer t.Close()
@@ -87,14 +85,9 @@ func main() {
 		log.Fatalln("Failed to make a new syncer:", err)
 	}
 
-	if err := s.Start(wfreq); err != nil {
+	if err := s.Run(wfreq); err != nil {
 		log.Fatalln("Failed to run syncer:", err)
 	}
-	defer s.Close()
-
-	sig := make(chan os.Signal)
-	signal.Notify(sig, os.Interrupt)
-	<-sig
 }
 
 type Application struct {

@@ -7,16 +7,14 @@ import (
 	"github.com/diamondburned/ffsync/internal/telemetry"
 )
 
-type Client struct{}
+type client struct{}
 
-var _ telemetry.Telemeter = (*Client)(nil)
-
-func New() Client {
-	return Client{}
+func New() telemetry.Telemeter {
+	return client{}
 }
 
-func (Client) WriteDuration(dura time.Duration, name string, attrs telemetry.Extras) {
+func (client) WriteDuration(dura time.Duration, name string, attrs telemetry.Extras) {
 	log.Printf("%s took %v to complete; attrs: %+v\n", name, dura, attrs)
 }
 
-func (Client) Close() {}
+func (client) Close() {}
