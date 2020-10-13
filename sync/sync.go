@@ -64,8 +64,6 @@ func (s *Syncer) Run(freq time.Duration) error {
 		return errors.Wrap(err, "Failed to add src recursively")
 	}
 
-	defer s.close()
-
 	// Catch up on non-encoded files.
 	go filepath.Walk(s.path, func(path string, info os.FileInfo, err error) error {
 		// Manually check if this is the right file.
@@ -83,8 +81,12 @@ func (s *Syncer) Run(freq time.Duration) error {
 
 	go s.w.Start(freq)
 
-	sig := make(chan os.Signal)
-	signal.Notify(sig, os.Interrupt)
+	go func() {
+		sig := make(chan os.Signal)
+		signal.Notify(sig, os.Interrupt)
+		<-sig
+		s.w.Close()
+	}()
 
 	for {
 		select {
@@ -94,15 +96,8 @@ func (s *Syncer) Run(freq time.Duration) error {
 			s.opts.ErrorLog(err)
 		case <-s.w.Closed:
 			return nil
-		case <-sig:
-			return nil
 		}
 	}
-}
-
-func (s *Syncer) close() error {
-	s.w.Close()
-	return nil
 }
 
 func (s *Syncer) event(ev watcher.Event) {
