@@ -103,8 +103,8 @@ func (s *Syncer) Run(freq time.Duration) error {
 func (s *Syncer) event(ev watcher.Event) {
 	switch ev.Op {
 	case watcher.Create:
-		dst := s.trans(ev)
-		log.Println("Created at", dst)
+		dst := s.replacePrefix(ev.Path)
+		log.Println("Creating", dst)
 
 		// Since there might be a race condition between events being sent,
 		// we're best ensuring a directory is made before every single file.
@@ -112,33 +112,40 @@ func (s *Syncer) event(ev watcher.Event) {
 		// Well, we should only transcode a file.
 		if !ev.IsDir() {
 			// Free to interrupt.
-			s.OnCreate(ev.Path, dst)
+			s.onCreate(ev.Path, dst)
 		}
 
 	case watcher.Move:
-		src, dst := s.pair(ev)
+		src := s.transpath(ev.OldPath, ev.IsDir())
+		dst := s.transpath(ev.Path, ev.IsDir())
 		log.Println("Moved from", src, "to", dst)
 		s.catch(osutil.MoveTimeout(time.Minute, src, dst), "mv")
 
 	case watcher.Rename:
-		src, dst := s.pair(ev)
+		src := s.transpath(ev.OldPath, ev.IsDir())
+		dst := s.transpath(ev.Path, ev.IsDir())
 		log.Println("Renamed from", src, "to", dst)
-		s.catch(os.Rename(s.pair(ev)), "rename from rename")
+		s.catch(os.Rename(src, dst), "rename from rename")
 
 	case watcher.Remove:
-		dst := s.trans(ev)
+		dst := s.transpath(ev.Path, ev.IsDir())
 		log.Println("Removed", dst)
 		s.catch(osutil.RemoveAllIfEmpty(ev.Path, dst), "rm -r from remove")
 	}
 }
 
-func (s *Syncer) OnCreate(src, dst string) {
+func (s *Syncer) onCreate(src, dst string) {
+	var action = s.opts.action(filepath.Ext(src))
+	if action == convertAction {
+		dst = s.c.ConvertExt(dst)
+	}
+
 	// See if the file already exists in the destination.
 	if _, err := os.Stat(dst); err == nil {
 		return
 	}
 
-	switch s.opts.action(filepath.Ext(src)) {
+	switch action {
 	case copyAction:
 		s.c.QueueCopy(src, dst)
 	case convertAction:
@@ -167,26 +174,23 @@ func (s *Syncer) checkPath(i os.FileInfo, abs string) error {
 }
 
 // transpath returns the transformed path from the given path
-func (s *Syncer) transpath(abs string, dir bool) (path string) {
+func (s *Syncer) transpath(abs string, dir bool) string {
 	// Trim the prefix.
-	path = strings.TrimPrefix(abs, s.path)
-	// Add the new prefix.
-	path = filepath.Join(s.dest, path)
-	// If this is not a directory, then convert the extension.
-	if !dir {
+	path := s.replacePrefix(abs)
+
+	// If this is not a directory and the action is a conversion, then convert
+	// the extension.
+	if !dir && s.opts.action(filepath.Ext(abs)) == convertAction {
 		path = s.c.ConvertExt(path)
 	}
+
 	return path
 }
 
-// trans returns the transformed path from the given event
-func (s *Syncer) trans(ev watcher.Event) (path string) {
-	return s.transpath(ev.Path, ev.IsDir())
-}
-
-// pair returns the old and new path relative to the destination path.
-func (s *Syncer) pair(ev watcher.Event) (string, string) {
-	return s.transpath(ev.OldPath, ev.IsDir()), s.transpath(ev.Path, ev.IsDir())
+// replacePrefix replaces the root directory with dest.
+func (s *Syncer) replacePrefix(abs string) (path string) {
+	// Trim the prefix and add the new one.
+	return filepath.Join(s.dest, strings.TrimPrefix(abs, s.path))
 }
 
 func (s *Syncer) catch(err error, failedTo string) {
