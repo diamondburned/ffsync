@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	CoverArtSz = "600"
+	CoverArtSz = "500"
 	CoverArtQ  = "5"
 )
 
@@ -39,7 +39,9 @@ func ExistsAlbum(dst string) (string, bool) {
 func ExtractAlbum(ctx context.Context, src, dst string) (*ffmpeg.Result, error) {
 	return ffmpeg.ExecuteCtx(ctx, src, forceCoverFile(dst),
 		// Album art options
-		"-c:v", "mjpeg", "-sws_flags", "lanczos", "-q:v", CoverArtQ, "-vf", vf,
+		"-c:v", "mjpeg",
+		"-vsync", "2",
+		"-sws_flags", "lanczos", "-huffman", "optimal", "-q:v", CoverArtQ, "-vf", vf,
 	)
 }
 

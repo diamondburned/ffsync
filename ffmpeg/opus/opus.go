@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	Bitrate = "128k"
-	VBRMode = "constrained"
+	Bitrate = "64k"
+	VBRMode = "on"
 )
 
 // ConvertCtx atomically converts src to dst as an opus file.
