@@ -6,7 +6,7 @@ import (
 	"github.com/diamondburned/ffsync/ffmpeg"
 )
 
-const (
+var (
 	Bitrate = "64k"
 	VBRMode = "on"
 )

@@ -11,13 +11,9 @@ import (
 	"github.com/diamondburned/ffsync/ffmpeg"
 )
 
-const (
+var (
 	CoverArtSz = "500"
 	CoverArtQ  = "5"
-)
-
-var (
-	vf = fmt.Sprintf("scale=-1:'min(%s,ih)'", CoverArtSz)
 )
 
 // ExistsAlbum returns true if the given output path contains a cover.jpg.
@@ -37,6 +33,8 @@ func ExistsAlbum(dst string) (string, bool) {
 // cover.jpg. The given dst is the destination to the music file, which this
 // function will automatically derive the path to cover.jpg.
 func ExtractAlbum(ctx context.Context, src, dst string) (*ffmpeg.Result, error) {
+	vf := fmt.Sprintf("scale=-1:'min(%s,ih)'", CoverArtSz)
+
 	return ffmpeg.ExecuteCtx(ctx, src, forceCoverFile(dst),
 		// Album art options
 		"-c:v", "mjpeg",

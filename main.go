@@ -28,6 +28,9 @@ func main() {
 		Formats     string `env:"FFSYNC_FORMATS"`
 		CopyFormats string `env:"FFSYNC_COPY_FORMATS"`
 		Frequency   string `env:"FFSYNC_FREQUENCY"`
+		Bitrate     string `env:"FFSYNC_BITRATE"`
+		CoverSize   string `env:"FFSYNC_COVER_SIZE"`
+		CoverQ      string `env:"FFSYNC_COVER_Q"`
 	}
 
 	_, err := env.UnmarshalFromEnviron(&config)
@@ -57,6 +60,16 @@ func main() {
 			log.Fatalln("Failed to parse frequency:", err)
 		}
 		wfreq = f
+	}
+
+	if config.Bitrate != "" {
+		opus.Bitrate = config.Bitrate
+	}
+	if config.CoverQ != "" {
+		cover.CoverArtQ = config.CoverQ
+	}
+	if config.CoverSize != "" {
+		cover.CoverArtSz = config.CoverSize
 	}
 
 	if len(os.Args) < 3 {
