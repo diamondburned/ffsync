@@ -66,6 +66,7 @@ in {
 			home       = cfg.dst;
 			group      = "users";
 			createHome = true;
+			isSystemUser = true;
 		};
 
 		systemd.services.ffsync = {
