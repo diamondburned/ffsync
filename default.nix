@@ -65,9 +65,13 @@ in {
 		users.users.ffsync = {
 			home       = cfg.dst;
 			group      = "users";
-			createHome = true;
+			createHome = false;
 			isSystemUser = true;
 		};
+
+		systemd.tmpfiles.rules = [
+			"d ${cfg.dst} 0755 ffsync users - -"
+		];
 
 		systemd.services.ffsync = {
 			description = "ffsync";
