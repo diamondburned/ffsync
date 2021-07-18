@@ -56,7 +56,7 @@ func New(src, dst string, opts Options, c Converter) (*Syncer, error) {
 // returned prematurely, if there is one.
 func (s *Syncer) Run(freq time.Duration) error {
 	// Prepare the destination directory.
-	if err := os.MkdirAll(s.dest, 0775); err != nil {
+	if err := os.MkdirAll(s.dest, os.ModePerm); err != nil {
 		return errors.Wrap(err, "Failed to mkdir -p destination directory")
 	}
 
@@ -108,7 +108,7 @@ func (s *Syncer) event(ev watcher.Event) {
 
 		// Since there might be a race condition between events being sent,
 		// we're best ensuring a directory is made before every single file.
-		s.catch(os.MkdirAll(filepath.Dir(dst), 0775), "mkdir -p from create")
+		s.catch(os.MkdirAll(filepath.Dir(dst), os.ModePerm), "mkdir -p from create")
 		// Well, we should only transcode a file.
 		if !ev.IsDir() {
 			// Free to interrupt.

@@ -86,6 +86,7 @@ in {
 					${lib.escapeShellArg cfg.src} \
 					${lib.escapeShellArg cfg.dst}
 				'';
+				UMask = "022"; # rwxr-xr-x
 				Type  = "simple";
 				User  = "ffsync";
 				Group = "users";

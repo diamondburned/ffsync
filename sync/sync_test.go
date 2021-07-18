@@ -99,7 +99,7 @@ FileLoop:
 
 	// Try making a file in a folder.
 	t.Log("mkdir astolfo")
-	if err := os.Mkdir(filepath.Join(m.src, "astolfo"), 0750); err != nil {
+	if err := os.Mkdir(filepath.Join(m.src, "astolfo"), os.ModePerm); err != nil {
 		t.Fatal("Failed to make a test directory:", err)
 	}
 
